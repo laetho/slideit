@@ -1,0 +1,4 @@
+github.com/mappu/miqt v0.14.0 h1:PPP3TBREc79Ei/sMous6rN+z6s7Y6pq5U+NsljtvVfg=
+github.com/mappu/miqt v0.14.0/go.mod h1:xFg7ADaO1QSkmXPsPODoKe/bydJpRG9fgCYyIDl/h1U=
+golang.org/x/sys v0.35.0 h1:vz1N37gP5bs89s7He8XuIYXpyY0+QlsKmzipCbUtyxI=
+golang.org/x/sys v0.35.0/go.mod h1:BJP2sWEmIv4KK5OTEluFJCKSidICx8ciO85XgH3Ak8k=

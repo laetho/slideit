@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  QT_VERSION: 6.8.3
+  CGO_ENABLED: 1
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86-64
+            os: ubuntu-24.04
+            platform: linux
+            artifact: slideit-linux-x86_64
+            binary: slideit
+          - name: Windows x86-64
+            os: windows-2022
+            platform: windows
+            artifact: slideit-windows-x86_64
+            binary: slideit.exe
+          - name: macOS Apple Silicon
+            os: macos-15
+            platform: macos
+            artifact: slideit-macos-arm64
+            binary: slideit
+          - name: macOS Intel
+            os: macos-15-intel
+            platform: macos
+            artifact: slideit-macos-x86_64
+            binary: slideit
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        if: matrix.platform != 'windows'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Install Task
+        uses: arduino/setup-task@v3
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgl1-mesa-dev
+
+      - name: Install Qt on Linux and macOS
+        if: matrix.platform != 'windows'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+          archives: qtbase qtdeclarative
+
+      - name: Verify Unix toolchain
+        if: matrix.platform != 'windows'
+        shell: bash
+        run: |
+          go version
+          task --version
+          pkg-config --modversion Qt6Core Qt6Qml Qt6Quick
+
+      - name: Build and test on Linux or macOS
+        if: matrix.platform != 'windows'
+        shell: bash
+        env:
+          BINARY_NAME: ${{ matrix.binary }}
+        run: task ci
+
+      - name: Install Windows UCRT64 toolchain
+        if: matrix.platform == 'windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          cache: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-go
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-declarative
+
+      - name: Verify Windows toolchain
+        if: matrix.platform == 'windows'
+        shell: msys2 {0}
+        run: |
+          go version
+          task --version
+          pkg-config --modversion Qt6Core Qt6Qml Qt6Quick
+
+      - name: Build and test on Windows
+        if: matrix.platform == 'windows'
+        shell: msys2 {0}
+        env:
+          BINARY_NAME: ${{ matrix.binary }}
+        run: task ci
+
+      - name: Archive Unix binary
+        if: matrix.platform != 'windows'
+        shell: bash
+        run: tar -C build -czf "build/${{ matrix.artifact }}.tar.gz" "${{ matrix.binary }}"
+
+      - name: Archive Windows binary
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: Compress-Archive -Path "build/${{ matrix.binary }}" -DestinationPath "build/${{ matrix.artifact }}.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: build/${{ matrix.artifact }}.*
+          if-no-files-found: error
+          retention-days: 14

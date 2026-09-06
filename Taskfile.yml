@@ -1,0 +1,73 @@
+version: '3'
+
+vars:
+  BINARY_NAME: '{{default "slideit" .BINARY_NAME}}'
+  BINARY: '{{.ROOT_DIR}}/build/{{.BINARY_NAME}}'
+
+tasks:
+  default:
+    desc: Build Slideit
+    cmds:
+      - task: build
+
+  deps:
+    desc: Download Go dependencies
+    cmds:
+      - go mod download
+
+  fmt:
+    desc: Format Go sources
+    cmds:
+      - gofmt -w main.go internal
+
+  fmt:check:
+    desc: Verify that Go sources are formatted
+    cmds:
+      - mkdir -p build
+      - gofmt -l main.go internal | tee build/gofmt.out
+      - test ! -s build/gofmt.out
+
+  lint:
+    desc: Run Go static analysis
+    cmds:
+      - go vet ./...
+
+  test:
+    desc: Run unit tests
+    cmds:
+      - go test ./...
+
+  build:
+    desc: Build the Go/Qt application
+    deps: [deps]
+    cmds:
+      - mkdir -p build
+      - go build -o '{{.BINARY}}' .
+
+  run:
+    desc: Build and run Slideit
+    deps: [build]
+    cmds:
+      - '{{.BINARY}}'
+
+  check:
+    desc: Format-check, vet, test, and build
+    cmds:
+      - task: fmt
+      - task: lint
+      - task: test
+      - task: build
+
+  ci:
+    desc: Run non-mutating CI checks and build
+    cmds:
+      - mkdir -p build
+      - task: fmt:check
+      - task: lint
+      - task: test
+      - task: build
+
+  clean:
+    desc: Remove build output
+    cmds:
+      - rm -rf build
