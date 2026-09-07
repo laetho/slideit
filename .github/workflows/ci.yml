@@ -85,6 +85,7 @@ jobs:
           echo "PKG_CONFIG_PATH=$qt_prefix/lib/pkgconfig" >> "$GITHUB_ENV"
           echo "LDFLAGS=-L$qt_prefix/lib" >> "$GITHUB_ENV"
           echo "CPPFLAGS=-I$qt_prefix/include" >> "$GITHUB_ENV"
+          echo "CGO_CXXFLAGS=-std=c++17" >> "$GITHUB_ENV"
           echo "QML2_IMPORT_PATH=$qt_prefix/share/qt/qml" >> "$GITHUB_ENV"
 
       - name: Verify Unix toolchain
