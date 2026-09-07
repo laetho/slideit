@@ -16,7 +16,7 @@ env:
   GOCACHE: ${{ github.workspace }}/.cache/go-build
   GOMODCACHE: ${{ github.workspace }}/.cache/go-mod
   # Increment when changing Qt/compiler families to invalidate cached cgo objects.
-  CGO_CACHE_EPOCH: '1'
+  CGO_CACHE_EPOCH: '2'
 
 jobs:
   build:
@@ -51,7 +51,7 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Initialize build directory on Unix
         if: matrix.platform != 'windows'
@@ -124,7 +124,7 @@ jobs:
 
       - name: Cache Go and MIQT build outputs on Unix
         if: matrix.platform != 'windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ${{ env.GOCACHE }}
@@ -157,11 +157,13 @@ jobs:
         shell: msys2 {0}
         run: |
           go version
+          g++ --version
+          printf '' | g++ -x c++ -Wno-sfinae-incomplete -fsyntax-only -
           pkg-config --modversion Qt6Core Qt6Qml Qt6Quick
 
       - name: Cache Go and MIQT build outputs on Windows
         if: matrix.platform == 'windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ${{ env.GOCACHE }}
@@ -171,6 +173,11 @@ jobs:
       - name: Build and test on Windows
         if: matrix.platform == 'windows'
         shell: msys2 {0}
+        env:
+          # GCC 16 warns about a valid Qt QChar forward-declaration/SFINAE
+          # pattern in every MIQT-generated translation unit. Keep all other
+          # compiler warnings visible.
+          CGO_CXXFLAGS: -Wno-sfinae-incomplete
         run: |
           mkdir -p build
           gofmt -l main.go internal | tee build/gofmt.out
@@ -191,7 +198,7 @@ jobs:
         run: Compress-Archive -Path "build/${{ matrix.binary }}" -DestinationPath "build/${{ matrix.artifact }}.zip"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: build/${{ matrix.artifact }}.*
@@ -207,7 +214,7 @@ jobs:
       contents: write
     steps:
       - name: Download matrix artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: release-assets
           merge-multiple: true

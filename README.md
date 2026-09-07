@@ -86,6 +86,10 @@ Linux and macOS invoke these checks through Task. The Windows job runs the same
 Go commands directly inside MSYS2 UCRT64 because the host-installed Task binary
 is not reliably exposed inside that isolated toolchain shell.
 
+The Windows GCC 16 build suppresses only `-Wsfinae-incomplete`, a repetitive
+diagnostic produced by Qt's `QChar` headers in MIQT-generated translation units.
+Other C++ warnings remain enabled.
+
 The QML file is embedded in the Go binary. CMake is not currently needed; if native adapters or Qt deployment targets are added later, Task remains the entry point and will delegate those steps to CMake.
 
 ## Controls
