@@ -213,6 +213,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Check out release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+
       - name: Download matrix artifacts
         uses: actions/download-artifact@v8
         with:

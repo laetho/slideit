@@ -161,7 +161,12 @@ ApplicationWindow {
     Item {
         id: viewport
         anchors.fill: parent
-        anchors.margins: 24
+        anchors.leftMargin: 24
+        anchors.rightMargin: 24
+        // Reserve the edge-control lanes even while the bubbles are hidden so
+        // photos and their rotated frames never render underneath controls.
+        anchors.topMargin: Math.max(24, topControls.implicitHeight + 12)
+        anchors.bottomMargin: Math.max(24, bottomControls.implicitHeight + 12)
 
         // Decode the next deck while the current deck's countdown is running.
         // These invisible Images share Qt's image cache with the visible deck.
@@ -213,10 +218,6 @@ ApplicationWindow {
         property bool currentDeckReady: false
         property int exitDirection: 1
         property int entryDirection: 1
-        // Include enough overscan for rotated cards, frames, and antialiased
-        // edges to clear the viewport completely before the deck is replaced.
-        property real slideDistance: viewport.width * 1.18 + 96
-
         function beginDeck() {
             warmupTimer.stop()
             deckTransition.stop()
@@ -264,17 +265,16 @@ ApplicationWindow {
             ScriptAction {
                 script: {
                     deckLoader.opacity = slideit.transition === "fade" || slideit.transition === "tilt" ? 0 : 1
-                    deckLoader.x = slideit.transition === "slide" ? viewport.entryDirection * viewport.slideDistance : 0
+                    // Start at the viewport boundary so the incoming deck begins
+                    // moving on-screen as soon as the outgoing deck has cleared it.
+                    deckLoader.x = slideit.transition === "slide" ? viewport.entryDirection * viewport.width : 0
                     deckLoader.scale = slideit.transition === "zoom" ? 0 : 1
                     deckLoader.rotation = slideit.transition === "tilt" ? -3 : 0
                 }
             }
             ParallelAnimation {
                 NumberAnimation { target: deckLoader; property: "opacity"; to: 1; duration: slideit.transition === "fade" || slideit.transition === "tilt" ? 750 : 0; easing.type: Easing.InOutCubic }
-                SequentialAnimation {
-                    NumberAnimation { target: deckLoader; property: "x"; to: viewport.entryDirection * viewport.width; duration: slideit.transition === "slide" ? 100 : 0; easing.type: Easing.OutCubic }
-                    NumberAnimation { target: deckLoader; property: "x"; to: 0; duration: slideit.transition === "slide" ? 1100 : 0; easing.type: Easing.InOutCubic }
-                }
+                NumberAnimation { target: deckLoader; property: "x"; to: 0; duration: slideit.transition === "slide" ? 1100 : 0; easing.type: Easing.InOutCubic }
                 NumberAnimation { target: deckLoader; property: "scale"; to: 1; duration: slideit.transition === "zoom" ? 1100 : 0; easing.type: Easing.OutCubic }
                 NumberAnimation { target: deckLoader; property: "rotation"; to: 0; duration: slideit.transition === "tilt" ? 900 : 0; easing.type: Easing.OutBack }
             }
@@ -290,8 +290,10 @@ ApplicationWindow {
             ParallelAnimation {
                 NumberAnimation { target: deckLoader; property: "opacity"; to: slideit.transition === "fade" || slideit.transition === "tilt" ? 0 : 1; duration: slideit.transition === "fade" || slideit.transition === "tilt" ? 600 : 0; easing.type: Easing.InOutCubic }
                 SequentialAnimation {
-                    NumberAnimation { target: deckLoader; property: "x"; to: slideit.transition === "slide" ? -viewport.exitDirection * viewport.width : 0; duration: slideit.transition === "slide" ? 1100 : 0; easing.type: Easing.InOutCubic }
-                    NumberAnimation { target: deckLoader; property: "x"; to: slideit.transition === "slide" ? -viewport.exitDirection * viewport.slideDistance : 0; duration: slideit.transition === "slide" ? 100 : 0; easing.type: Easing.InCubic }
+                    // Spend almost all transition time while the deck is visible,
+                    // then clear the final offscreen margin quickly.
+                    NumberAnimation { target: deckLoader; property: "x"; to: slideit.transition === "slide" ? -viewport.exitDirection * viewport.width * 0.9 : 0; duration: slideit.transition === "slide" ? 720 : 0; easing.type: Easing.InCubic }
+                    NumberAnimation { target: deckLoader; property: "x"; to: slideit.transition === "slide" ? -viewport.exitDirection * viewport.width : 0; duration: slideit.transition === "slide" ? 60 : 0; easing.type: Easing.Linear }
                 }
                 NumberAnimation { target: deckLoader; property: "scale"; to: slideit.transition === "zoom" ? 0 : 1; duration: slideit.transition === "zoom" ? 1100 : 0; easing.type: Easing.InCubic }
                 NumberAnimation { target: deckLoader; property: "rotation"; to: slideit.transition === "tilt" ? viewport.exitDirection * 3 : 0; duration: slideit.transition === "tilt" ? 700 : 0; easing.type: Easing.InBack }
@@ -620,13 +622,6 @@ ApplicationWindow {
                     font.italic: true
                     horizontalAlignment: Text.AlignHCenter
                     lineHeight: 1.35
-                }
-                Label {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "Made with Go, Qt, QML, and MIQT"
-                    color: slideit.muted
-                    font.family: "monospace"
-                    font.pixelSize: 11
                 }
             }
         }
