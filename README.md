@@ -62,6 +62,11 @@ task ci
 CI artifacts contain the application executable only. They are build artifacts,
 not yet self-contained Qt runtime bundles.
 
+Pushing a version tag such as `v0.1.0` runs the complete matrix and creates a
+GitHub release containing all four platform archives. Stable version tags are
+marked as the repository's latest release. Tags containing a hyphen, such as
+`v0.2.0-beta.1`, are published as prereleases.
+
 The macOS jobs install Homebrew Qt because MIQT requires Qt `.pc` files through
 `pkg-config`; the official macOS Qt framework archives do not expose that build
 interface. They also set `CGO_CXXFLAGS=-std=c++17`, because Qt 6 requires C++17
