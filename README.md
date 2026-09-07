@@ -64,7 +64,9 @@ not yet self-contained Qt runtime bundles.
 
 The macOS jobs install Homebrew Qt because MIQT requires Qt `.pc` files through
 `pkg-config`; the official macOS Qt framework archives do not expose that build
-interface.
+interface. They also set `CGO_CXXFLAGS=-std=c++17`, because Qt 6 requires C++17
+while cgo does not otherwise guarantee that Clang language mode for MIQT's
+generated C++ sources.
 
 The Linux job installs the complete Qt desktop package rather than filtering Qt
 archives. Qt's prebuilt Linux libraries require the matching bundled ICU runtime,

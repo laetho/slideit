@@ -48,7 +48,13 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Initialize build directory
+      - name: Initialize build directory on Unix
+        if: matrix.platform != 'windows'
+        shell: bash
+        run: mkdir -p build
+
+      - name: Initialize build directory on Windows
+        if: matrix.platform == 'windows'
         shell: pwsh
         run: New-Item -ItemType Directory -Force -Path build | Out-Null
 
@@ -89,6 +95,7 @@ jobs:
           echo "PKG_CONFIG_PATH=$qt_prefix/lib/pkgconfig" >> "$GITHUB_ENV"
           echo "LDFLAGS=-L$qt_prefix/lib" >> "$GITHUB_ENV"
           echo "CPPFLAGS=-I$qt_prefix/include" >> "$GITHUB_ENV"
+          echo "CGO_CXXFLAGS=-std=c++17" >> "$GITHUB_ENV"
           echo "QML2_IMPORT_PATH=$qt_prefix/share/qt/qml" >> "$GITHUB_ENV"
 
       - name: Verify Unix toolchain
@@ -98,6 +105,11 @@ jobs:
           go version
           task --version
           echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
+          if [[ "${{ matrix.platform }}" == "macos" ]]; then
+            clang++ --version
+            echo "CGO_CXXFLAGS=$CGO_CXXFLAGS"
+            [[ "$CGO_CXXFLAGS" == *"-std=c++17"* ]]
+          fi
           pkg-config --modversion Qt6Core Qt6Qml Qt6Quick
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
             ldd "$QT_ROOT_DIR/lib/libQt6Core.so" | tee build/qt6core-dependencies.txt
