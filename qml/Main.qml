@@ -125,6 +125,7 @@ ApplicationWindow {
     Shortcut { sequence: "T"; onActivated: window.interact("cycle-transition") }
     Shortcut { sequence: "F5"; onActivated: window.interact("refresh") }
     Shortcut { sequence: "?"; onActivated: window.toggleSelector("help") }
+    Shortcut { sequence: "A"; onActivated: window.toggleSelector("about") }
     Shortcut { sequence: "Q"; onActivated: Qt.quit() }
     Shortcut {
         sequence: "Escape"
@@ -581,10 +582,52 @@ ApplicationWindow {
             }
             Label {
                 visible: window.selector === "help"
-                text: "Space  play/pause    ←/→  navigate    M  layout\nS  order    [/]  photo count    -/+  timing\nC  fit/crop    B  frame    T  transition\nF  fullscreen    O  folder    Q  quit"
+                text: "Space  play/pause    ←/→  navigate    M  layout\nS  order    [/]  photo count    -/+  timing\nC  fit/crop    B  frame    T  transition\nF  fullscreen    O  folder    A  about    Q  quit"
                 color: slideit.foreground
                 font.family: "monospace"
                 padding: 8
+            }
+            ColumnLayout {
+                visible: window.selector === "about"
+                spacing: 12
+                Layout.minimumWidth: 340
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: "Slideit"
+                    color: slideit.foreground
+                    font.family: "monospace"
+                    font.pixelSize: 24
+                    font.bold: true
+                }
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: "A quiet place for memories in pictures."
+                    color: slideit.muted
+                    font.family: "monospace"
+                    font.pixelSize: 13
+                }
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: slideit.border
+                }
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: "Dedicated to the memory of my father,\nTrygve."
+                    color: slideit.foreground
+                    font.family: "monospace"
+                    font.pixelSize: 16
+                    font.italic: true
+                    horizontalAlignment: Text.AlignHCenter
+                    lineHeight: 1.35
+                }
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: "Made with Go, Qt, QML, and MIQT"
+                    color: slideit.muted
+                    font.family: "monospace"
+                    font.pixelSize: 11
+                }
             }
         }
         onClosed: window.selectorOpen = false

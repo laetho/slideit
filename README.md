@@ -2,6 +2,8 @@
 
 A keyboard-first local photo slideshow for Omarchy, built with Go, Qt 6, QML, and [MIQT](https://github.com/mappu/miqt).
 
+Dedicated to the memory of my father, Trygve.
+
 ## Features
 
 - Single, grid, and deterministic montage layouts
@@ -110,6 +112,7 @@ The QML file is embedded in the Go binary. CMake is not currently needed; if nat
 | `O` | Open folder |
 | `F5` | Rescan |
 | `?` | Help |
+| `A` | About and dedication |
 | `Q` | Quit |
 
 Move the pointer or press a key to reveal the edge controls. They fade after three seconds and remain visible while hovered or while a selector is open.
