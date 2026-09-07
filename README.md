@@ -72,6 +72,11 @@ The Linux job installs the complete Qt desktop package rather than filtering Qt
 archives. Qt's prebuilt Linux libraries require the matching bundled ICU runtime,
 which can otherwise be omitted by a minimal archive selection.
 
+CI caches both the Go module directory and Go build cache independently for every
+matrix target. This retains MIQT's expensive cgo compilation while preventing
+objects from crossing OS, architecture, or Qt toolchain boundaries. Increment
+`CGO_CACHE_EPOCH` in the workflow whenever the compiler or Qt ABI family changes.
+
 The QML file is embedded in the Go binary. CMake is not currently needed; if native adapters or Qt deployment targets are added later, Task remains the entry point and will delegate those steps to CMake.
 
 ## Controls
