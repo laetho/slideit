@@ -62,6 +62,14 @@ task ci
 CI artifacts contain the application executable only. They are build artifacts,
 not yet self-contained Qt runtime bundles.
 
+The macOS jobs install Homebrew Qt because MIQT requires Qt `.pc` files through
+`pkg-config`; the official macOS Qt framework archives do not expose that build
+interface.
+
+The Linux job installs the complete Qt desktop package rather than filtering Qt
+archives. Qt's prebuilt Linux libraries require the matching bundled ICU runtime,
+which can otherwise be omitted by a minimal archive selection.
+
 The QML file is embedded in the Go binary. CMake is not currently needed; if native adapters or Qt deployment targets are added later, Task remains the entry point and will delegate those steps to CMake.
 
 ## Controls

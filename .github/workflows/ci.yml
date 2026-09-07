@@ -65,13 +65,27 @@ jobs:
         if: matrix.platform == 'linux'
         run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgl1-mesa-dev
 
-      - name: Install Qt on Linux and macOS
-        if: matrix.platform != 'windows'
+      - name: Install Qt on Linux
+        if: matrix.platform == 'linux'
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
           cache: true
-          archives: qtbase qtdeclarative
+          # Do not restrict `archives`: the Qt desktop package includes matching
+          # ICU runtime libraries that QtCore needs but Ubuntu does not provide.
+          cache-key-prefix: slideit-qt-full
+
+      - name: Install Qt on macOS
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          brew install qt pkgconf
+          qt_prefix="$(brew --prefix qt)"
+          echo "$qt_prefix/bin" >> "$GITHUB_PATH"
+          echo "PKG_CONFIG_PATH=$qt_prefix/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "LDFLAGS=-L$qt_prefix/lib" >> "$GITHUB_ENV"
+          echo "CPPFLAGS=-I$qt_prefix/include" >> "$GITHUB_ENV"
+          echo "QML2_IMPORT_PATH=$qt_prefix/share/qt/qml" >> "$GITHUB_ENV"
 
       - name: Verify Unix toolchain
         if: matrix.platform != 'windows'
@@ -79,7 +93,12 @@ jobs:
         run: |
           go version
           task --version
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
           pkg-config --modversion Qt6Core Qt6Qml Qt6Quick
+          if [[ "${{ matrix.platform }}" == "linux" ]]; then
+            ldd "$QT_ROOT_DIR/lib/libQt6Core.so" | tee build/qt6core-dependencies.txt
+            ! grep -q "not found" build/qt6core-dependencies.txt
+          fi
 
       - name: Build and test on Linux or macOS
         if: matrix.platform != 'windows'
