@@ -169,6 +169,13 @@ ApplicationWindow {
             visible: false
             width: viewport.width
             height: viewport.height
+            property int photoCount: Math.max(1, (slideit.nextDeck || []).length)
+            property int columns: slideit.layout === "single" ? 1 : slideit.layout === "montage"
+                ? Math.min(photoCount, Math.max(1, Math.ceil(Math.sqrt(photoCount * width / Math.max(1, height)))))
+                : Math.ceil(Math.sqrt(photoCount))
+            property int rows: Math.ceil(photoCount / columns)
+            property real cellWidth: (width - (columns - 1) * (slideit.layout === "montage" ? 16 : 12)) / columns
+            property real cellHeight: (height - (rows - 1) * (slideit.layout === "montage" ? 16 : 12)) / rows
             Repeater {
                 model: window.playing && viewport.currentDeckReady ? (slideit.nextDeck || []) : []
                 delegate: Image {
@@ -177,8 +184,8 @@ ApplicationWindow {
                     asynchronous: true
                     autoTransform: true
                     cache: true
-                    sourceSize.width: Math.ceil(viewport.width * Screen.devicePixelRatio)
-                    sourceSize.height: Math.ceil(viewport.height * Screen.devicePixelRatio)
+                    sourceSize.width: Math.ceil(preloader.cellWidth * Screen.devicePixelRatio * 1.15)
+                    sourceSize.height: Math.ceil(preloader.cellHeight * Screen.devicePixelRatio * 1.15)
                 }
             }
         }
@@ -201,10 +208,13 @@ ApplicationWindow {
 
         property int readyPhotos: 0
         property int expectedPhotos: (slideit.deck || []).length
-        property int observedDeckIndex: slideit.deckIndex
+        property int observedDeckRevision: slideit.deckRevision || 0
         property bool currentDeckReady: false
         property int exitDirection: 1
         property int entryDirection: 1
+        // Include enough overscan for rotated cards, frames, and antialiased
+        // edges to clear the viewport completely before the deck is replaced.
+        property real slideDistance: viewport.width * 1.18 + 96
 
         function beginDeck() {
             warmupTimer.stop()
@@ -238,7 +248,7 @@ ApplicationWindow {
         }
 
         onExpectedPhotosChanged: beginDeck()
-        onObservedDeckIndexChanged: beginDeck()
+        onObservedDeckRevisionChanged: beginDeck()
         Component.onCompleted: beginDeck()
 
         Timer {
@@ -253,14 +263,17 @@ ApplicationWindow {
             ScriptAction {
                 script: {
                     deckLoader.opacity = slideit.transition === "fade" || slideit.transition === "tilt" ? 0 : 1
-                    deckLoader.x = slideit.transition === "slide" ? viewport.entryDirection * viewport.width : 0
+                    deckLoader.x = slideit.transition === "slide" ? viewport.entryDirection * viewport.slideDistance : 0
                     deckLoader.scale = slideit.transition === "zoom" ? 0 : 1
                     deckLoader.rotation = slideit.transition === "tilt" ? -3 : 0
                 }
             }
             ParallelAnimation {
                 NumberAnimation { target: deckLoader; property: "opacity"; to: 1; duration: slideit.transition === "fade" || slideit.transition === "tilt" ? 750 : 0; easing.type: Easing.InOutCubic }
-                NumberAnimation { target: deckLoader; property: "x"; to: 0; duration: slideit.transition === "slide" ? 1200 : 0; easing.type: Easing.InOutCubic }
+                SequentialAnimation {
+                    NumberAnimation { target: deckLoader; property: "x"; to: viewport.entryDirection * viewport.width; duration: slideit.transition === "slide" ? 100 : 0; easing.type: Easing.OutCubic }
+                    NumberAnimation { target: deckLoader; property: "x"; to: 0; duration: slideit.transition === "slide" ? 1100 : 0; easing.type: Easing.InOutCubic }
+                }
                 NumberAnimation { target: deckLoader; property: "scale"; to: 1; duration: slideit.transition === "zoom" ? 1100 : 0; easing.type: Easing.OutCubic }
                 NumberAnimation { target: deckLoader; property: "rotation"; to: 0; duration: slideit.transition === "tilt" ? 900 : 0; easing.type: Easing.OutBack }
             }
@@ -275,7 +288,10 @@ ApplicationWindow {
             id: deckExit
             ParallelAnimation {
                 NumberAnimation { target: deckLoader; property: "opacity"; to: slideit.transition === "fade" || slideit.transition === "tilt" ? 0 : 1; duration: slideit.transition === "fade" || slideit.transition === "tilt" ? 600 : 0; easing.type: Easing.InOutCubic }
-                NumberAnimation { target: deckLoader; property: "x"; to: slideit.transition === "slide" ? -viewport.exitDirection * viewport.width : 0; duration: slideit.transition === "slide" ? 1200 : 0; easing.type: Easing.InOutCubic }
+                SequentialAnimation {
+                    NumberAnimation { target: deckLoader; property: "x"; to: slideit.transition === "slide" ? -viewport.exitDirection * viewport.width : 0; duration: slideit.transition === "slide" ? 1100 : 0; easing.type: Easing.InOutCubic }
+                    NumberAnimation { target: deckLoader; property: "x"; to: slideit.transition === "slide" ? -viewport.exitDirection * viewport.slideDistance : 0; duration: slideit.transition === "slide" ? 100 : 0; easing.type: Easing.InCubic }
+                }
                 NumberAnimation { target: deckLoader; property: "scale"; to: slideit.transition === "zoom" ? 0 : 1; duration: slideit.transition === "zoom" ? 1100 : 0; easing.type: Easing.InCubic }
                 NumberAnimation { target: deckLoader; property: "rotation"; to: slideit.transition === "tilt" ? viewport.exitDirection * 3 : 0; duration: slideit.transition === "tilt" ? 700 : 0; easing.type: Easing.InBack }
             }
@@ -336,10 +352,11 @@ ApplicationWindow {
                         height: parent.height - (parent.parent.framed ? parent.parent.frameEdge + parent.parent.frameBottom : 0)
                         source: parent.parent.source
                         asynchronous: true
-                        retainWhileLoading: true
                         autoTransform: true
                         smooth: true
-                        mipmap: true
+                        // Images are decoded near their final display size;
+                        // mipmaps would add upload time and ~33% texture memory.
+                        mipmap: false
                         cache: true
                         sourceSize.width: Math.ceil(width * Screen.devicePixelRatio * 1.15)
                         sourceSize.height: Math.ceil(height * Screen.devicePixelRatio * 1.15)

@@ -5,35 +5,39 @@ import (
 	"math"
 	"net/url"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
 	qt "github.com/mappu/miqt/qt6"
 	"github.com/mappu/miqt/qt6/qml"
 )
 
 type Controller struct {
-	state       *qml.QQmlPropertyMap
-	settings    Settings
-	images      []Image
-	ordered     []Image
-	deck        []Image
-	deckIndex   int
-	scanResults chan scanResult
-	timer       *qt.QTimer
-	themeTimer  *qt.QTimer
-	themeStamp  string
+	state        *qml.QQmlPropertyMap
+	settings     Settings
+	images       []Image
+	ordered      []Image
+	deck         []Image
+	deckIndex    int
+	deckRevision int
+	scanResults  chan scanResult
+	scanRequest  uint64
+	timer        *qt.QTimer
+	themeTimer   *qt.QTimer
+	themeStamp   string
+	published    map[string]any
 }
 
 type scanResult struct {
-	folder string
-	images []Image
-	err    error
+	request uint64
+	folder  string
+	images  []Image
+	err     error
 }
 
 func NewController(initialFolder string) (*Controller, error) {
-	c := &Controller{settings: loadSettings(), scanResults: make(chan scanResult, 1)}
+	c := &Controller{settings: loadSettings(), scanResults: make(chan scanResult, 8), published: make(map[string]any)}
 	c.state = qml.NewQQmlPropertyMap()
 	c.publishTheme()
 	c.publishState("")
@@ -73,6 +77,7 @@ func (c *Controller) onValueChanged(key string, value *qt.QVariant) {
 	if action == "" {
 		return
 	}
+	settingsChanged := false
 	switch action {
 	case "folder":
 		if parsed, err := url.Parse(argument); err == nil && parsed.Scheme == "file" {
@@ -91,50 +96,66 @@ func (c *Controller) onValueChanged(key string, value *qt.QVariant) {
 		c.updateDeck()
 	case "layout":
 		c.setLayout(argument)
+		settingsChanged = true
 	case "cycle-layout":
 		c.cycleLayout()
+		settingsChanged = true
 	case "order":
 		c.setOrder(argument)
+		settingsChanged = true
 	case "cycle-order":
 		c.cycleOrder()
+		settingsChanged = true
 	case "reverse":
 		c.settings.Descending = !c.settings.Descending
 		c.reorder(true)
+		settingsChanged = true
 	case "count":
 		if n, err := strconv.Atoi(argument); err == nil {
 			c.settings.PerDeck = clamp(n, 1, 12)
 			c.updateDeck()
+			settingsChanged = true
 		}
 	case "interval":
 		if n, err := strconv.Atoi(argument); err == nil {
 			c.settings.Interval = clamp(n, 2, 60)
 			c.publishState("")
+			settingsChanged = true
 		}
 	case "crop":
 		c.settings.Crop = !c.settings.Crop
 		c.publishState("")
+		settingsChanged = true
 	case "frame":
 		c.setFrameStyle(argument)
+		settingsChanged = true
 	case "cycle-frame":
 		styles := []string{"none", "white", "aged", "black"}
 		c.setFrameStyle(styles[(indexOf(styles, c.settings.FrameStyle)+1)%len(styles)])
+		settingsChanged = true
 	case "frame-size":
 		if argument == "thin" || argument == "medium" || argument == "thick" {
 			c.settings.FrameSize = argument
 			c.publishState("")
+			settingsChanged = true
 		}
 	case "transition":
 		c.setTransition(argument)
+		settingsChanged = true
 	case "cycle-transition":
 		transitions := []string{"none", "fade", "slide", "zoom", "tilt"}
 		c.setTransition(transitions[(indexOf(transitions, c.settings.Transition)+1)%len(transitions)])
+		settingsChanged = true
 	case "fullscreen":
 		c.settings.Fullscreen = argument == "true"
 		c.publishState("")
+		settingsChanged = true
 	case "refresh":
 		c.scan(c.settings.Folder)
 	}
-	_ = saveSettings(c.settings)
+	if settingsChanged {
+		_ = saveSettings(c.settings)
+	}
 }
 
 func (c *Controller) setFrameStyle(style string) {
@@ -168,19 +189,20 @@ func (c *Controller) scan(folder string) {
 		return
 	}
 	c.insert("loading", true)
+	c.scanRequest++
+	request := c.scanRequest
 	go func() {
 		images, err := Scan(folder)
-		result := scanResult{folder: folder, images: images, err: err}
-		select {
-		case c.scanResults <- result:
-		default:
-		}
+		c.scanResults <- scanResult{request: request, folder: folder, images: images, err: err}
 	}()
 }
 
 func (c *Controller) poll() {
 	select {
 	case result := <-c.scanResults:
+		if result.request != c.scanRequest {
+			return
+		}
 		c.insert("loading", false)
 		if result.err != nil {
 			c.insert("message", result.err.Error())
@@ -229,6 +251,8 @@ func (c *Controller) updateDeck() {
 	c.publishDeck()
 	c.publishNextDeck()
 	c.publishState("")
+	c.deckRevision++
+	c.insert("deckRevision", c.deckRevision)
 }
 
 func (c *Controller) publishDeck() {
@@ -328,7 +352,12 @@ func (c *Controller) publishState(message string) {
 }
 
 func (c *Controller) publishTheme() {
+	stamp := themeSignature()
+	if stamp != "" && stamp == c.themeStamp {
+		return
+	}
 	theme := loadTheme()
+	c.themeStamp = stamp
 	c.insert("background", theme.Background)
 	c.insert("foreground", theme.Foreground)
 	c.insert("accent", theme.Accent)
@@ -339,15 +368,14 @@ func (c *Controller) publishTheme() {
 }
 
 func (c *Controller) refreshTheme() {
-	stamp := fmt.Sprintf("%d", time.Now().Unix()/2)
-	// Theme switches replace the directory. Reloading this tiny palette periodically is robust on Wayland sessions.
-	if stamp != c.themeStamp {
-		c.themeStamp = stamp
-		c.publishTheme()
-	}
+	c.publishTheme()
 }
 
 func (c *Controller) insert(key string, value any) {
+	if previous, ok := c.published[key]; ok && reflect.DeepEqual(previous, value) {
+		return
+	}
+	c.published[key] = value
 	var variant *qt.QVariant
 	switch typed := value.(type) {
 	case string:

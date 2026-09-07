@@ -2,10 +2,33 @@ package slides
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+func themePaths() []string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	return []string{
+		filepath.Join(home, ".local/state/omarchy/current/theme/colors.toml"),
+		filepath.Join(home, ".local/state/omarchy/current/theme/shell.toml"),
+		filepath.Join(home, ".config/omarchy/shell.toml"),
+	}
+}
+
+func themeSignature() string {
+	signature := ""
+	for _, path := range themePaths() {
+		if info, err := os.Stat(path); err == nil {
+			signature += fmt.Sprintf("%s:%d:%d;", path, info.Size(), info.ModTime().UnixNano())
+		}
+	}
+	return signature
+}
 
 type Theme struct {
 	Background string
@@ -23,14 +46,10 @@ func defaultTheme() Theme {
 
 func loadTheme() Theme {
 	theme := defaultTheme()
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return theme
-	}
 	values := map[string]string{}
-	parseTOML(filepath.Join(home, ".local/state/omarchy/current/theme/colors.toml"), values)
-	parseTOML(filepath.Join(home, ".local/state/omarchy/current/theme/shell.toml"), values)
-	parseTOML(filepath.Join(home, ".config/omarchy/shell.toml"), values)
+	for _, path := range themePaths() {
+		parseTOML(path, values)
+	}
 	theme.Background = pick(values, theme.Background, "background", "base.background")
 	theme.Foreground = pick(values, theme.Foreground, "foreground", "base.foreground")
 	theme.Accent = pick(values, theme.Accent, "accent", "base.accent")

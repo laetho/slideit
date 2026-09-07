@@ -16,6 +16,7 @@ type Image struct {
 	Modified     time.Time
 	Created      time.Time
 	HasCreatedAt bool
+	NameKey      string
 }
 
 var imageExtensions = map[string]bool{
@@ -43,7 +44,7 @@ func Scan(folder string) ([]Image, error) {
 		path := filepath.Join(folder, entry.Name())
 		created, hasCreated := birthTime(path)
 		images = append(images, Image{
-			Path: path, Name: entry.Name(), Modified: info.ModTime(),
+			Path: path, Name: entry.Name(), NameKey: strings.ToLower(entry.Name()), Modified: info.ModTime(),
 			Created: created, HasCreatedAt: hasCreated,
 		})
 	}
@@ -72,7 +73,14 @@ func Order(images []Image, mode string, descending bool, seed uint64) []Image {
 		case "modified":
 			comparison = a.Modified.Compare(b.Modified)
 		default:
-			comparison = strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+			aKey, bKey := a.NameKey, b.NameKey
+			if aKey == "" {
+				aKey = strings.ToLower(a.Name)
+			}
+			if bKey == "" {
+				bKey = strings.ToLower(b.Name)
+			}
+			comparison = strings.Compare(aKey, bKey)
 		}
 		if comparison == 0 {
 			comparison = strings.Compare(a.Name, b.Name)
