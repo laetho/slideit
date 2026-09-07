@@ -1,122 +1,241 @@
 # Slideit
 
-A keyboard-first local photo slideshow for Omarchy, built with Go, Qt 6, QML, and [MIQT](https://github.com/mappu/miqt).
+Slideit is a keyboard-first photo slideshow for local folders. It combines a
+Go backend with a Qt 6/QML interface and follows the active Omarchy theme when
+available.
 
-Dedicated to the memory of my father, Trygve.
+> Dedicated to the memory of my father, Trygve.
 
 ## Features
 
-- Single, grid, and deterministic montage layouts
-- Aspect-aware montage composition that favors more columns on wide screens
-- Filename, filesystem creation-time, modification-time, and shuffled ordering
-- Configurable 1–12 photos per deck
-- Asynchronous, display-sized image decoding
-- Fullscreen playback with keyboard and mouse navigation
-- Temporary control bubbles docked to the top and bottom edges
-- Toggleable Polaroid-style white, aged yellow, or black frames with three thicknesses
-- Selectable none, fade, slide, zoom, and tilt deck transitions
-- Matched outgoing and incoming phases for every transition
-- Next-deck image preloading during timed playback
-- Active Omarchy colors and Fontconfig `monospace` font
-- Persistent settings in `$XDG_CONFIG_HOME/slideit/settings.json`
-
-Creation time is filesystem birth time where Linux and the filesystem expose it. Slideit falls back to modification time when unavailable; it is not camera EXIF capture time.
+- Single-image, grid, and non-overlapping montage layouts
+- Aspect-aware montages with wider arrangements on wide screens
+- Configurable deck size from 1 to 12 photos
+- Filename, creation-time, modification-time, and shuffled ordering
+- Automatic playback with next-deck preloading
+- None, fade, slide, zoom, and tilt transitions
+- Optional white, aged-yellow, or black Polaroid frames
+- Thin, medium, and thick frame options
+- Fit and crop display modes
+- Full keyboard and mouse control
+- Auto-hiding controls docked to the top and bottom edges
+- Omarchy theme integration with a built-in fallback palette
+- Persistent folder, layout, ordering, frame, transition, and timing settings
 
 ## Requirements
 
-- Go 1.27+
-- Qt 6.8+ development packages (`Core`, `Gui`, `Qml`, `Quick`, and `QuickControls2`)
-- A C++ compiler and `pkg-config`
-- [Task](https://taskfile.dev/) for the recommended workflow
+- Go 1.27 or newer
+- Qt 6.8 or newer
+- Qt Core, Gui, Qml, Quick, Quick Controls, Dialogs, Layouts, and Window modules
+- A C++ compiler
+- `pkg-config`
+- [Task](https://taskfile.dev/) for the recommended local workflow
 
-On Omarchy/Arch, install missing development dependencies with the normal package workflow rather than editing packaged Omarchy files.
+MIQT uses cgo, so a Go compiler alone is not enough. Qt development headers,
+libraries, and a compatible C++ toolchain must be available through
+`pkg-config`.
 
 ## Build and run
 
+Build the application:
+
 ```bash
 task build
+```
+
+Run it using the last selected folder:
+
+```bash
 task run
 ```
 
 Open a folder directly:
 
 ```bash
-task build
 ./build/slideit ~/Pictures
 ```
 
-The command-line folder takes precedence over the last folder saved in the settings.
+Only the first positional argument is used. It must be a folder path and takes
+precedence over the folder saved in settings. Additional arguments are ignored.
+There are currently no command-line flags.
 
-Run all checks:
+## Supported images
 
-```bash
-task check
+Slideit scans the selected folder itself; subdirectories are not scanned.
+Recognized extensions are:
+
+```text
+AVIF  BMP  GIF  HEIC  HEIF  JPEG  JPG  PNG  TIFF  TIF  WebP
 ```
 
-CI uses a native GitHub Actions matrix for Linux x86-64, Windows x86-64,
-macOS Apple Silicon, and macOS Intel. The same non-mutating checks can be run
-locally with:
+Actual decoding support depends on the Qt image plugins installed on the
+system.
 
-```bash
-task ci
-```
-
-CI artifacts contain the application executable only. They are build artifacts,
-not yet self-contained Qt runtime bundles.
-
-Pushing a version tag such as `v0.1.0` runs the complete matrix and creates a
-GitHub release containing all four platform archives. Stable version tags are
-marked as the repository's latest release. Tags containing a hyphen, such as
-`v0.2.0-beta.1`, are published as prereleases.
-
-The macOS jobs install Homebrew Qt because MIQT requires Qt `.pc` files through
-`pkg-config`; the official macOS Qt framework archives do not expose that build
-interface. They also set `CGO_CXXFLAGS=-std=c++17`, because Qt 6 requires C++17
-while cgo does not otherwise guarantee that Clang language mode for MIQT's
-generated C++ sources.
-
-The Linux job installs the complete Qt desktop package rather than filtering Qt
-archives. Qt's prebuilt Linux libraries require the matching bundled ICU runtime,
-which can otherwise be omitted by a minimal archive selection.
-
-CI caches both the Go module directory and Go build cache independently for every
-matrix target. This retains MIQT's expensive cgo compilation while preventing
-objects from crossing OS, architecture, or Qt toolchain boundaries. Increment
-`CGO_CACHE_EPOCH` in the workflow whenever the compiler or Qt ABI family changes.
-
-Linux and macOS invoke these checks through Task. The Windows job runs the same
-Go commands directly inside MSYS2 UCRT64 because the host-installed Task binary
-is not reliably exposed inside that isolated toolchain shell.
-
-The Windows GCC 16 build suppresses only `-Wsfinae-incomplete`, a repetitive
-diagnostic produced by Qt's `QChar` headers in MIQT-generated translation units.
-Other C++ warnings remain enabled.
-
-The QML file is embedded in the Go binary. CMake is not currently needed; if native adapters or Qt deployment targets are added later, Task remains the entry point and will delegate those steps to CMake.
+Creation-time ordering uses the filesystem creation or birth timestamp exposed
+by Linux, macOS, or Windows. If it is unavailable, Slideit falls back to the
+modification time. Filesystem creation time is not the camera's EXIF capture
+date.
 
 ## Controls
 
+### Keyboard
+
 | Key | Action |
 |---|---|
-| `Space` | Play/pause |
-| `Left` / `Right`, `H` / `L` | Previous/next deck |
-| `M` | Cycle layout |
-| `S` / `Shift+S` | Cycle/reverse ordering |
-| `R` | Toggle shuffled/name ordering |
-| `[` / `]` | Change photos per deck |
-| `-` / `+` | Change interval |
-| `C` | Fit/crop |
-| `B` | Cycle frame off/white/black |
-| `T` | Cycle transition |
-| `F` or `F11` | Fullscreen |
-| `O` | Open folder |
-| `F5` | Rescan |
-| `?` | Help |
-| `A` | About and dedication |
+| `Space` | Play or pause |
+| `Right`, `L`, `Page Down` | Next deck |
+| `Left`, `H`, `Page Up` | Previous deck |
+| `Home` / `End` | First or last deck |
+| `M` | Cycle single, grid, and montage layouts |
+| `S` | Cycle name, creation, modification, and random ordering |
+| `Shift+S` | Reverse the current ordered mode |
+| `R` | Toggle between random and filename ordering |
+| `[` / `]` | Decrease or increase photos per deck |
+| `-` / `+` | Decrease or increase the playback interval |
+| `C` | Toggle fit and crop |
+| `B` | Cycle frames off, white, aged, and black |
+| `T` | Cycle transition mode |
+| `F`, `F11` | Toggle fullscreen |
+| `O` | Choose a folder |
+| `F5` | Rescan the current folder |
+| `?` | Show shortcut help |
+| `A` | Show About and dedication |
+| `Escape` | Close a menu, exit fullscreen, or quit |
 | `Q` | Quit |
 
-Move the pointer or press a key to reveal the edge controls. They fade after three seconds and remain visible while hovered or while a selector is open.
+Photo count ranges from 1 to 12. The selector offers common presets, while
+`[` and `]` adjust the value one photo at a time.
 
-In grid or montage mode, click the **N photos** bubble to choose the number of pictures shown on each deck. The `[` and `]` shortcuts adjust the same setting one image at a time.
+Playback intervals range from 2 to 60 seconds. The selector offers 3, 5, 8,
+12, and 20-second presets; `-` and `+` adjust the interval one second at a time.
 
-Use the **R** bubble in the bottom controls, or press `R`, to toggle random ordering. The bubble uses the active accent color while random mode is enabled.
+### Mouse
+
+- Move the pointer to reveal controls.
+- Click the left quarter of the window for the previous deck.
+- Click the right quarter for the next deck.
+- Click the center to play or pause.
+- Scroll to move between decks.
+- Right-click to close an open selector.
+
+Controls disappear after three seconds of inactivity. They remain visible while
+hovered or while a selector is open. Image content stays between the top and
+bottom control lanes and is not rendered beneath the bubbles.
+
+## Defaults and settings
+
+Default values:
+
+| Setting | Default |
+|---|---|
+| Layout | Single |
+| Ordering | Filename, ascending |
+| Photos per grid/montage deck | 5 |
+| Playback interval | 8 seconds |
+| Display mode | Fit |
+| Frame | White, medium |
+| Transition | Fade |
+
+Slideit stores settings under the platform's standard user configuration
+directory:
+
+```text
+<user-config-directory>/slideit/settings.json
+```
+
+On Linux this normally resolves to:
+
+```text
+$XDG_CONFIG_HOME/slideit/settings.json
+```
+
+Play/pause state is not persisted.
+
+## Omarchy integration
+
+On Omarchy, Slideit reads the active palette from:
+
+```text
+~/.local/state/omarchy/current/theme/colors.toml
+~/.local/state/omarchy/current/theme/shell.toml
+~/.config/omarchy/shell.toml
+```
+
+Theme changes are detected while the application is running. Slideit uses a
+built-in palette when these files are unavailable, allowing it to run on other
+Linux desktops, macOS, and Windows. The generic `monospace` family is resolved
+by the host platform.
+
+## Development
+
+| Command | Purpose |
+|---|---|
+| `task deps` | Download Go modules |
+| `task fmt` | Format Go sources |
+| `task fmt:check` | Check formatting without changing files |
+| `task lint` | Run `go vet` |
+| `task test` | Run unit tests |
+| `task build` | Build `build/slideit` |
+| `task run` | Build and run Slideit |
+| `task check` | Format, vet, test, and build |
+| `task ci` | Run non-mutating CI checks and build |
+| `task clean` | Remove build output |
+
+`task check` modifies unformatted Go files. Use `task ci` when a non-mutating
+validation command is required.
+
+The QML source is embedded in the Go executable. CMake is not currently needed.
+If native adapters or Qt deployment targets are introduced later, Task remains
+the public entry point and may delegate those steps to CMake.
+
+## Continuous integration
+
+GitHub Actions builds a native matrix for:
+
+- Linux x86-64
+- Windows x86-64 with MSYS2 UCRT64/MinGW
+- macOS Apple Silicon
+- macOS Intel
+
+CI runs on pushes to `main`, pull requests, version tags, and manual dispatch.
+Build artifacts are retained for 14 days.
+
+The current artifacts contain only the Slideit executable. They are not yet
+self-contained Qt application bundles and require compatible Qt libraries and
+QML modules on the target system.
+
+### Platform notes
+
+- Linux uses the complete Qt 6.8.3 desktop package so Qt's matching ICU runtime
+  is available.
+- macOS uses Homebrew Qt and `pkg-config`. MIQT-generated C++ is compiled in
+  C++17 mode.
+- Windows builds inside MSYS2 UCRT64 and runs Go commands directly in that
+  environment.
+- Go module and cgo build caches are isolated by platform and toolchain. Increase
+  `CGO_CACHE_EPOCH` in the workflow after changing the Qt ABI or compiler family.
+
+## Releases
+
+Push a version tag to run the complete matrix and publish a GitHub release:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Stable tags are marked as the latest release. Tags containing a hyphen are
+published as prereleases:
+
+```text
+v0.2.0-beta.1
+```
+
+Expected release assets:
+
+```text
+slideit-linux-x86_64.tar.gz
+slideit-windows-x86_64.zip
+slideit-macos-arm64.tar.gz
+slideit-macos-x86_64.tar.gz
+```
