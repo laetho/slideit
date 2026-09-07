@@ -70,6 +70,7 @@ jobs:
           cache: false
 
       - name: Install Task
+        if: matrix.platform != 'windows'
         uses: arduino/setup-task@v3
         with:
           version: 3.x
@@ -155,7 +156,6 @@ jobs:
         shell: msys2 {0}
         run: |
           go version
-          task --version
           pkg-config --modversion Qt6Core Qt6Qml Qt6Quick
 
       - name: Cache Go and MIQT build outputs on Windows
@@ -170,9 +170,14 @@ jobs:
       - name: Build and test on Windows
         if: matrix.platform == 'windows'
         shell: msys2 {0}
-        env:
-          BINARY_NAME: ${{ matrix.binary }}
-        run: task ci
+        run: |
+          mkdir -p build
+          gofmt -l main.go internal | tee build/gofmt.out
+          test ! -s build/gofmt.out
+          go vet ./...
+          go test ./...
+          go mod download
+          go build -o "build/${{ matrix.binary }}" .
 
       - name: Archive Unix binary
         if: matrix.platform != 'windows'
