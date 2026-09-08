@@ -250,7 +250,9 @@ Release packaging differs by platform:
   C++17 mode. The macOS CI jobs pin Xcode 16.1 (Apple clang 16.0.0) because the
   runner's default Xcode 16.4 (clang 17.0.0) crashes the compiler frontend while
   building MIQT's generated `gen_qiconengine.cpp`; do not remove that pin without
-  confirming the newer toolchain no longer crashes.
+  confirming the newer toolchain no longer crashes. `macdeployqt` deploys without
+  signing; CI then ad-hoc signs nested Mach-O files and bundles inside-out before
+  signing and verifying the outer application.
 - Windows builds inside MSYS2 UCRT64 and runs Go commands directly in that
   environment.
 - Go module and cgo build caches are isolated by platform and toolchain. Increase

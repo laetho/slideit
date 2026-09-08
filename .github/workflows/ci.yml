@@ -260,13 +260,16 @@ jobs:
           test -x "$deployqt"
           "$deployqt" "$bundle" \
             -qmldir="$PWD/qml" \
+            -libpath="$(brew --prefix)/lib" \
             -no-strip \
-            -codesign=- \
+            -no-codesign \
             -verbose=2
 
           test -x "$bundle/Contents/MacOS/slideit"
           test -d "$bundle/Contents/Frameworks"
           test -d "$bundle/Contents/PlugIns"
+
+          APP="$bundle" python3 packaging/macos/adhoc-sign.py
           codesign --verify --deep --strict --verbose=2 "$bundle"
 
       - name: Archive macOS application
