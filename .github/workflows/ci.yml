@@ -187,21 +187,72 @@ jobs:
           go mod download
           go build -o "build/${{ matrix.binary }}" .
 
-      - name: Archive Unix binary
-        if: matrix.platform != 'windows'
+      - name: Archive Linux binary
+        if: matrix.platform == 'linux'
         shell: bash
         run: tar -C build -czf "build/${{ matrix.artifact }}.tar.gz" "${{ matrix.binary }}"
 
-      - name: Archive Windows binary
+      - name: Package Windows application
+        if: matrix.platform == 'windows'
+        shell: msys2 {0}
+        run: |
+          stage="$PWD/dist/${{ matrix.artifact }}"
+          rm -rf "$stage"
+          mkdir -p "$stage"
+          cp "build/${{ matrix.binary }}" "$stage/${{ matrix.binary }}"
+          /ucrt64/bin/windeployqt6.exe \
+            --release \
+            --qmldir "$PWD/qml" \
+            --dir "$stage" \
+            "$stage/${{ matrix.binary }}"
+          test -f "$stage/platforms/qwindows.dll"
+          test -d "$stage/qml/QtQuick"
+
+      - name: Archive Windows application
         if: matrix.platform == 'windows'
         shell: pwsh
-        run: Compress-Archive -Path "build/${{ matrix.binary }}" -DestinationPath "build/${{ matrix.artifact }}.zip"
+        run: Compress-Archive -LiteralPath "dist/${{ matrix.artifact }}" -DestinationPath "build/${{ matrix.artifact }}.zip" -CompressionLevel Optimal
+
+      - name: Package macOS application
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          bundle="$PWD/dist/Slideit.app"
+          rm -rf "$bundle"
+          mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
+          cp "build/${{ matrix.binary }}" "$bundle/Contents/MacOS/slideit"
+          chmod 755 "$bundle/Contents/MacOS/slideit"
+          cp packaging/macos/Info.plist "$bundle/Contents/Info.plist"
+
+          qt_prefix="$(brew --prefix qt)"
+          deployqt="$qt_prefix/bin/macdeployqt"
+          if [[ ! -x "$deployqt" ]]; then
+            deployqt="$(brew --prefix qtbase)/bin/macdeployqt"
+          fi
+          test -x "$deployqt"
+          "$deployqt" "$bundle" \
+            -qmldir="$PWD/qml" \
+            -no-strip \
+            -codesign=- \
+            -verbose=2
+
+          test -x "$bundle/Contents/MacOS/slideit"
+          test -d "$bundle/Contents/Frameworks"
+          test -d "$bundle/Contents/PlugIns"
+          codesign --verify --deep --strict --verbose=2 "$bundle"
+
+      - name: Archive macOS application
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: ditto -c -k --sequesterRsrc --keepParent dist/Slideit.app "build/${{ matrix.artifact }}.zip"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
-          path: build/${{ matrix.artifact }}.*
+          path: |
+            build/${{ matrix.artifact }}.tar.gz
+            build/${{ matrix.artifact }}.zip
           if-no-files-found: error
           retention-days: 14
 
@@ -229,8 +280,8 @@ jobs:
         run: |
           test -f release-assets/slideit-linux-x86_64.tar.gz
           test -f release-assets/slideit-windows-x86_64.zip
-          test -f release-assets/slideit-macos-arm64.tar.gz
-          test -f release-assets/slideit-macos-x86_64.tar.gz
+          test -f release-assets/slideit-macos-arm64.zip
+          test -f release-assets/slideit-macos-x86_64.zip
 
       - name: Create GitHub release
         env:

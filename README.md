@@ -200,9 +200,14 @@ GitHub Actions builds a native matrix for:
 CI runs on pushes to `main`, pull requests, version tags, and manual dispatch.
 Build artifacts are retained for 14 days.
 
-The current artifacts contain only the Slideit executable. They are not yet
-self-contained Qt application bundles and require compatible Qt libraries and
-QML modules on the target system.
+Release packaging differs by platform:
+
+- Linux remains a binary-only tarball and requires compatible Qt libraries and
+  QML modules on the target system.
+- Windows is a self-contained portable directory ZIP produced by `windeployqt`.
+- macOS is a self-contained, ad-hoc-signed `Slideit.app` ZIP produced by
+  `macdeployqt`. It is not notarized, so Gatekeeper may require users to confirm
+  that they want to open it.
 
 ### Platform notes
 
@@ -236,6 +241,6 @@ Expected release assets:
 ```text
 slideit-linux-x86_64.tar.gz
 slideit-windows-x86_64.zip
-slideit-macos-arm64.tar.gz
-slideit-macos-x86_64.tar.gz
+slideit-macos-arm64.zip
+slideit-macos-x86_64.zip
 ```
