@@ -16,7 +16,7 @@ env:
   GOCACHE: ${{ github.workspace }}/.cache/go-build
   GOMODCACHE: ${{ github.workspace }}/.cache/go-mod
   # Increment when changing Qt/compiler families to invalidate cached cgo objects.
-  CGO_CACHE_EPOCH: '2'
+  CGO_CACHE_EPOCH: '3'
 
 jobs:
   build:
@@ -90,6 +90,26 @@ jobs:
           # Do not restrict `archives`: the Qt desktop package includes matching
           # ICU runtime libraries that QtCore needs but Ubuntu does not provide.
           cache-key-prefix: slideit-qt-full
+
+      - name: Select Xcode 16.1 on macOS
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          # Apple clang 17.0.0 (Xcode 16.4, the runner default) crashes with
+          # "Abort trap: 6" while compiling miqt's generated gen_qiconengine.cpp
+          # during `go vet ./...`. Pin the older, stable clang 16.0.0 toolchain
+          # (Xcode 16.1) to avoid the deterministic compiler frontend bug.
+          if [[ ! -d /Applications/Xcode_16.1.app ]]; then
+            echo "::error::Xcode 16.1 not found; the default Xcode 16.4 (clang 17) crashes the miqt cgo build"
+            exit 1
+          fi
+          sudo xcode-select -s /Applications/Xcode_16.1.app
+          xcode-select -p
+          clang++ --version | head -n 1
+          clang++ --version | grep -q 'clang-1600' || {
+            echo "::error::Expected Apple clang 16.0.0 (Xcode 16.1), got: $(clang++ --version | head -n 1)"
+            exit 1
+          }
 
       - name: Install Qt on macOS
         if: matrix.platform == 'macos'

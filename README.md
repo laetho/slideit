@@ -214,7 +214,10 @@ Release packaging differs by platform:
 - Linux uses the complete Qt 6.8.3 desktop package so Qt's matching ICU runtime
   is available.
 - macOS uses Homebrew Qt and `pkg-config`. MIQT-generated C++ is compiled in
-  C++17 mode.
+  C++17 mode. The macOS CI jobs pin Xcode 16.1 (Apple clang 16.0.0) because the
+  runner's default Xcode 16.4 (clang 17.0.0) crashes the compiler frontend while
+  building MIQT's generated `gen_qiconengine.cpp`; do not remove that pin without
+  confirming the newer toolchain no longer crashes.
 - Windows builds inside MSYS2 UCRT64 and runs Go commands directly in that
   environment.
 - Go module and cgo build caches are isolated by platform and toolchain. Increase
