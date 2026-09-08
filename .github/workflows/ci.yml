@@ -81,6 +81,13 @@ jobs:
         if: matrix.platform == 'linux'
         run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgl1-mesa-dev
 
+      - name: Configure Linux C++ diagnostics
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          printf '' | g++ -x c++ -Wno-sfinae-incomplete -fsyntax-only -
+          echo 'CGO_CXXFLAGS=-Wno-sfinae-incomplete' >> "$GITHUB_ENV"
+
       - name: Install Qt on Linux
         if: matrix.platform == 'linux'
         uses: jurplel/install-qt-action@v4
@@ -131,6 +138,7 @@ jobs:
           go version
           task --version
           echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
+          echo "CGO_CXXFLAGS=${CGO_CXXFLAGS:-}"
           if [[ "${{ matrix.platform }}" == "macos" ]]; then
             clang++ --version
             echo "CGO_CXXFLAGS=$CGO_CXXFLAGS"

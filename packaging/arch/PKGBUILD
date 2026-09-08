@@ -1,0 +1,87 @@
+# Maintainer: Laetho <https://github.com/laetho>
+
+pkgname=slideit
+pkgver=0.1.2
+pkgrel=1
+pkgdesc='Keyboard-first local photo slideshow for Omarchy and Arch Linux'
+arch=('x86_64')
+url='https://github.com/laetho/slideit'
+license=('MIT')
+depends=(
+  'qt6-base>=6.8'
+  'qt6-declarative>=6.8'
+  'qt6-wayland>=6.8'
+)
+makedepends=('go>=1.27')
+checkdepends=('desktop-file-utils')
+optdepends=(
+  'qt6-imageformats: TIFF, WebP, and additional Qt image formats'
+  'kimageformats: additional image plugins including AVIF and HEIF/HEIC'
+)
+# MIQT's generated cgo DWARF currently triggers debugedit errors on Arch.
+# Keep the release package stripped and avoid generating an unusable debug split.
+options=('!lto' '!debug')
+source=(
+  "${pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/v${pkgver}.tar.gz"
+  'slideit.desktop'
+  'LICENSE'
+)
+sha256sums=(
+  '65b0f50a2e10fe5cee2359ccd084763d0f64f142dc366132d37946805e7c6e96'
+  '42a5723455ef5ebe47f6ef913fb98faa7d8f6af68aff7d6000779a80178ad956'
+  'f1631fc601b5718f101bd226fa09398d0ce48e1e90b1e1d1a3168bbf6cabbbc5'
+)
+
+_go_env() {
+  export GOPATH="${srcdir}/gopath"
+  export GOCACHE="${srcdir}/go-build"
+  export GOTOOLCHAIN=local
+}
+
+prepare() {
+  cd "${pkgname}-${pkgver}"
+  _go_env
+  go mod download -modcacherw
+  go mod vendor
+}
+
+build() {
+  cd "${pkgname}-${pkgver}"
+  _go_env
+
+  export CGO_CPPFLAGS="${CPPFLAGS}"
+  export CGO_CFLAGS="${CFLAGS}"
+  export CGO_CXXFLAGS="${CXXFLAGS} -Wno-sfinae-incomplete"
+  export CGO_LDFLAGS="${LDFLAGS}"
+
+  mkdir -p build
+  go build \
+    -buildmode=pie \
+    -trimpath \
+    -mod=vendor \
+    -ldflags="-linkmode=external -extldflags '${LDFLAGS}'" \
+    -o build/slideit \
+    .
+}
+
+check() {
+  cd "${pkgname}-${pkgver}"
+  _go_env
+
+  export CGO_CPPFLAGS="${CPPFLAGS}"
+  export CGO_CFLAGS="${CFLAGS}"
+  export CGO_CXXFLAGS="${CXXFLAGS} -Wno-sfinae-incomplete"
+  export CGO_LDFLAGS="${LDFLAGS}"
+
+  go test -mod=vendor ./...
+  desktop-file-validate "${srcdir}/slideit.desktop"
+}
+
+package() {
+  cd "${pkgname}-${pkgver}"
+
+  install -Dm755 build/slideit "${pkgdir}/usr/bin/slideit"
+  install -Dm644 "${srcdir}/slideit.desktop" \
+    "${pkgdir}/usr/share/applications/org.omarchy.slideit.desktop"
+  install -Dm644 "${srcdir}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

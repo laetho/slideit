@@ -1,2 +1,6 @@
 build/
 /.cache/
+/packaging/arch/pkg/
+/packaging/arch/src/
+/packaging/arch/*.pkg.tar.*
+/packaging/arch/*.tar.gz

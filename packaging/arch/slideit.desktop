@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Slideit
+GenericName=Photo Slideshow
+Comment=View a local picture folder as a slideshow
+Exec=slideit
+Terminal=false
+Categories=Graphics;Photography;Viewer;
+Keywords=photo;image;slideshow;montage;
+StartupNotify=true

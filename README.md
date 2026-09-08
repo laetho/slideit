@@ -188,6 +188,38 @@ The QML source is embedded in the Go executable. CMake is not currently needed.
 If native adapters or Qt deployment targets are introduced later, Task remains
 the public entry point and may delegate those steps to CMake.
 
+## Arch Linux and Omarchy package
+
+An Arch `PKGBUILD` and desktop entry are available under `packaging/arch/`.
+Build the package from that directory:
+
+```bash
+cd packaging/arch
+makepkg -si
+```
+
+The package installs:
+
+```text
+/usr/bin/slideit
+/usr/share/applications/org.omarchy.slideit.desktop
+```
+
+Runtime dependencies are `qt6-base`, `qt6-declarative`, and `qt6-wayland`.
+Install `qt6-imageformats` and `kimageformats` for broader image-format support.
+The PKGBUILD downloads and vendors Go modules during `prepare()`, then builds
+and tests from that vendor tree so cgo does not depend on a mutable module-cache
+path during later makepkg phases. Split debug packaging is disabled because
+Arch's `debugedit` cannot currently process portions of MIQT's generated cgo
+DWARF data.
+
+Slideit is released under the MIT License. The Arch package installs the license
+under `/usr/share/licenses/slideit/LICENSE`.
+
+## License
+
+Slideit is licensed under the [MIT License](LICENSE).
+
 ## Continuous integration
 
 GitHub Actions builds a native matrix for:
@@ -212,7 +244,8 @@ Release packaging differs by platform:
 ### Platform notes
 
 - Linux uses the complete Qt 6.8.3 desktop package so Qt's matching ICU runtime
-  is available.
+  is available. GCC's repetitive Qt `QChar` SFINAE diagnostic is suppressed;
+  other C++ warnings remain enabled.
 - macOS uses Homebrew Qt and `pkg-config`. MIQT-generated C++ is compiled in
   C++17 mode. The macOS CI jobs pin Xcode 16.1 (Apple clang 16.0.0) because the
   runner's default Xcode 16.4 (clang 17.0.0) crashes the compiler frontend while
