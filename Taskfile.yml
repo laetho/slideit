@@ -1,8 +1,7 @@
 version: '3'
 
 vars:
-  BINARY_NAME: '{{default "slideit" .BINARY_NAME}}'
-  BINARY: '{{.ROOT_DIR}}/build/{{.BINARY_NAME}}'
+  BINARY: '{{.ROOT_DIR}}/build/slideit'
 
 tasks:
   default:

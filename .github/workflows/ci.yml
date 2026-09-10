@@ -20,76 +20,38 @@ env:
 
 jobs:
   build:
-    name: ${{ matrix.name }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Linux x86-64
-            os: ubuntu-24.04
-            platform: linux
-            artifact: slideit-linux-x86_64
-            binary: slideit
-          - name: Windows x86-64
-            os: windows-2022
-            platform: windows
-            artifact: slideit-windows-x86_64
-            binary: slideit.exe
-          - name: macOS Apple Silicon
-            os: macos-15
-            platform: macos
-            artifact: slideit-macos-arm64
-            binary: slideit
-          - name: macOS Intel
-            os: macos-15-intel
-            platform: macos
-            artifact: slideit-macos-x86_64
-            binary: slideit
-
-    runs-on: ${{ matrix.os }}
+    name: Linux x86-64
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
 
     steps:
       - name: Check out source
         uses: actions/checkout@v7
 
-      - name: Initialize build directory on Unix
-        if: matrix.platform != 'windows'
-        shell: bash
+      - name: Initialize build directory
         run: mkdir -p build
 
-      - name: Initialize build directory on Windows
-        if: matrix.platform == 'windows'
-        shell: pwsh
-        run: New-Item -ItemType Directory -Force -Path build | Out-Null
-
       - name: Install Go
-        if: matrix.platform != 'windows'
         uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: false
 
       - name: Install Task
-        if: matrix.platform != 'windows'
         uses: arduino/setup-task@v3
         with:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Linux build dependencies
-        if: matrix.platform == 'linux'
+      - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgl1-mesa-dev
 
-      - name: Configure Linux C++ diagnostics
-        if: matrix.platform == 'linux'
-        shell: bash
+      - name: Configure C++ diagnostics
         run: |
           printf '' | g++ -x c++ -Wno-sfinae-incomplete -fsyntax-only -
           echo 'CGO_CXXFLAGS=-Wno-sfinae-incomplete' >> "$GITHUB_ENV"
 
-      - name: Install Qt on Linux
-        if: matrix.platform == 'linux'
+      - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
@@ -98,210 +60,35 @@ jobs:
           # ICU runtime libraries that QtCore needs but Ubuntu does not provide.
           cache-key-prefix: slideit-qt-full
 
-      - name: Select Xcode 16.1 on macOS
-        if: matrix.platform == 'macos'
-        shell: bash
-        run: |
-          # Apple clang 17.0.0 (Xcode 16.4, the runner default) crashes with
-          # "Abort trap: 6" while compiling miqt's generated gen_qiconengine.cpp
-          # during `go vet ./...`. Pin the older, stable clang 16.0.0 toolchain
-          # (Xcode 16.1) to avoid the deterministic compiler frontend bug.
-          if [[ ! -d /Applications/Xcode_16.1.app ]]; then
-            echo "::error::Xcode 16.1 not found; the default Xcode 16.4 (clang 17) crashes the miqt cgo build"
-            exit 1
-          fi
-          sudo xcode-select -s /Applications/Xcode_16.1.app
-          xcode-select -p
-          clang++ --version | head -n 1
-          clang++ --version | grep -q 'clang-1600' || {
-            echo "::error::Expected Apple clang 16.0.0 (Xcode 16.1), got: $(clang++ --version | head -n 1)"
-            exit 1
-          }
-
-      - name: Install Qt on macOS
-        if: matrix.platform == 'macos'
-        shell: bash
-        run: |
-          brew install qt pkgconf
-          qt_prefix="$(brew --prefix qt)"
-          echo "$qt_prefix/bin" >> "$GITHUB_PATH"
-          echo "PKG_CONFIG_PATH=$qt_prefix/lib/pkgconfig" >> "$GITHUB_ENV"
-          echo "LDFLAGS=-L$qt_prefix/lib" >> "$GITHUB_ENV"
-          echo "CPPFLAGS=-I$qt_prefix/include" >> "$GITHUB_ENV"
-          echo "CGO_CXXFLAGS=-std=c++17" >> "$GITHUB_ENV"
-          echo "QML2_IMPORT_PATH=$qt_prefix/share/qt/qml" >> "$GITHUB_ENV"
-
-      - name: Verify Unix toolchain
-        if: matrix.platform != 'windows'
-        shell: bash
+      - name: Verify toolchain
         run: |
           go version
           task --version
           echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
           echo "CGO_CXXFLAGS=${CGO_CXXFLAGS:-}"
-          if [[ "${{ matrix.platform }}" == "macos" ]]; then
-            clang++ --version
-            echo "CGO_CXXFLAGS=$CGO_CXXFLAGS"
-            [[ "$CGO_CXXFLAGS" == *"-std=c++17"* ]]
-          fi
           pkg-config --modversion Qt6Core Qt6Qml Qt6Quick
-          if [[ "${{ matrix.platform }}" == "linux" ]]; then
-            ldd "$QT_ROOT_DIR/lib/libQt6Core.so" | tee build/qt6core-dependencies.txt
-            ! grep -q "not found" build/qt6core-dependencies.txt
-          fi
+          ldd "$QT_ROOT_DIR/lib/libQt6Core.so" | tee build/qt6core-dependencies.txt
+          ! grep -q "not found" build/qt6core-dependencies.txt
 
-      - name: Cache Go and MIQT build outputs on Unix
-        if: matrix.platform != 'windows'
+      - name: Cache Go and MIQT build outputs
         uses: actions/cache@v6
         with:
           path: |
             ${{ env.GOCACHE }}
             ${{ env.GOMODCACHE }}
-          key: go-cgo-${{ env.CGO_CACHE_EPOCH }}-${{ matrix.artifact }}-${{ env.QT_VERSION }}-${{ hashFiles('go.sum') }}
+          key: go-cgo-${{ env.CGO_CACHE_EPOCH }}-linux-x86_64-${{ env.QT_VERSION }}-${{ hashFiles('go.sum') }}
 
-      - name: Build and test on Linux or macOS
-        if: matrix.platform != 'windows'
-        shell: bash
-        env:
-          BINARY_NAME: ${{ matrix.binary }}
+      - name: Build and test
         run: task ci
 
-      - name: Install Windows UCRT64 toolchain
-        if: matrix.platform == 'windows'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: true
-          cache: true
-          install: >-
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-go
-            mingw-w64-ucrt-x86_64-pkgconf
-            mingw-w64-ucrt-x86_64-qt6-base
-            mingw-w64-ucrt-x86_64-qt6-declarative
-
-      - name: Verify Windows toolchain
-        if: matrix.platform == 'windows'
-        shell: msys2 {0}
-        run: |
-          go version
-          g++ --version
-          printf '' | g++ -x c++ -Wno-sfinae-incomplete -fsyntax-only -
-          pkg-config --modversion Qt6Core Qt6Qml Qt6Quick
-
-      - name: Cache Go and MIQT build outputs on Windows
-        if: matrix.platform == 'windows'
-        uses: actions/cache@v6
-        with:
-          path: |
-            ${{ env.GOCACHE }}
-            ${{ env.GOMODCACHE }}
-          key: go-cgo-${{ env.CGO_CACHE_EPOCH }}-${{ matrix.artifact }}-msys2-ucrt64-${{ hashFiles('go.sum') }}
-
-      - name: Build and test on Windows
-        if: matrix.platform == 'windows'
-        shell: msys2 {0}
-        env:
-          # GCC 16 warns about a valid Qt QChar forward-declaration/SFINAE
-          # pattern in every MIQT-generated translation unit. Keep all other
-          # compiler warnings visible.
-          CGO_CXXFLAGS: -Wno-sfinae-incomplete
-        run: |
-          mkdir -p build
-          gofmt -l main.go internal | tee build/gofmt.out
-          test ! -s build/gofmt.out
-          go vet ./...
-          go test ./...
-          go mod download
-          go build -o "build/${{ matrix.binary }}" .
-
       - name: Archive Linux binary
-        if: matrix.platform == 'linux'
-        shell: bash
-        run: tar -C build -czf "build/${{ matrix.artifact }}.tar.gz" "${{ matrix.binary }}"
-
-      - name: Package Windows application
-        if: matrix.platform == 'windows'
-        shell: msys2 {0}
-        run: |
-          stage="$PWD/dist/${{ matrix.artifact }}"
-          rm -rf "$stage"
-          mkdir -p "$stage"
-          cp "build/${{ matrix.binary }}" "$stage/${{ matrix.binary }}"
-          /ucrt64/bin/windeployqt6.exe \
-            --release \
-            --qmldir "$PWD/qml" \
-            --dir "$stage" \
-            "$stage/${{ matrix.binary }}"
-
-          # windeployqt does not reliably bundle the MinGW-w64 runtime DLLs that
-          # the cgo-linked executable and the Qt DLLs depend on. Copy them
-          # explicitly so the portable directory runs on machines without MSYS2.
-          cp /ucrt64/bin/libgcc_s_seh-1.dll \
-             /ucrt64/bin/libstdc++-6.dll \
-             /ucrt64/bin/libwinpthread-1.dll \
-             "$stage/"
-          test -f "$stage/libgcc_s_seh-1.dll"
-          test -f "$stage/libstdc++-6.dll"
-          test -f "$stage/libwinpthread-1.dll"
-
-          # Audit: every DLL imported by the executable or any bundled DLL must
-          # be either bundled in the staging directory or provided by Windows
-          # itself. Catches future missing-DLL regressions, including transitive
-          # Qt dependencies (e.g. ICU, zlib).
-          bash scripts/audit-windows-deps.sh "$stage" "build/${{ matrix.binary }}"
-
-          test -f "$stage/platforms/qwindows.dll"
-          test -d "$stage/qml/QtQuick"
-
-      - name: Archive Windows application
-        if: matrix.platform == 'windows'
-        shell: pwsh
-        run: Compress-Archive -LiteralPath "dist/${{ matrix.artifact }}" -DestinationPath "build/${{ matrix.artifact }}.zip" -CompressionLevel Optimal
-
-      - name: Package macOS application
-        if: matrix.platform == 'macos'
-        shell: bash
-        run: |
-          bundle="$PWD/dist/Slideit.app"
-          rm -rf "$bundle"
-          mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
-          cp "build/${{ matrix.binary }}" "$bundle/Contents/MacOS/slideit"
-          chmod 755 "$bundle/Contents/MacOS/slideit"
-          cp packaging/macos/Info.plist "$bundle/Contents/Info.plist"
-
-          qt_prefix="$(brew --prefix qt)"
-          deployqt="$qt_prefix/bin/macdeployqt"
-          if [[ ! -x "$deployqt" ]]; then
-            deployqt="$(brew --prefix qtbase)/bin/macdeployqt"
-          fi
-          test -x "$deployqt"
-          "$deployqt" "$bundle" \
-            -qmldir="$PWD/qml" \
-            -libpath="$(brew --prefix)/lib" \
-            -no-strip \
-            -no-codesign \
-            -verbose=2
-
-          test -x "$bundle/Contents/MacOS/slideit"
-          test -d "$bundle/Contents/Frameworks"
-          test -d "$bundle/Contents/PlugIns"
-
-          APP="$bundle" python3 packaging/macos/adhoc-sign.py
-          codesign --verify --deep --strict --verbose=2 "$bundle"
-
-      - name: Archive macOS application
-        if: matrix.platform == 'macos'
-        shell: bash
-        run: ditto -c -k --sequesterRsrc --keepParent dist/Slideit.app "build/${{ matrix.artifact }}.zip"
+        run: tar -C build -czf build/slideit-linux-x86_64.tar.gz slideit
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.artifact }}
-          path: |
-            build/${{ matrix.artifact }}.tar.gz
-            build/${{ matrix.artifact }}.zip
+          name: slideit-linux-x86_64
+          path: build/slideit-linux-x86_64.tar.gz
           if-no-files-found: error
           retention-days: 14
 
@@ -318,24 +105,18 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      - name: Download matrix artifacts
+      - name: Download build artifact
         uses: actions/download-artifact@v8
         with:
           path: release-assets
           merge-multiple: true
 
-      - name: Verify release assets
-        shell: bash
-        run: |
-          test -f release-assets/slideit-linux-x86_64.tar.gz
-          test -f release-assets/slideit-windows-x86_64.zip
-          test -f release-assets/slideit-macos-arm64.zip
-          test -f release-assets/slideit-macos-x86_64.zip
+      - name: Verify release asset
+        run: test -f release-assets/slideit-linux-x86_64.tar.gz
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
         run: |
           prerelease_flag=()
           latest_flag=(--latest)
@@ -344,7 +125,7 @@ jobs:
             latest_flag=()
           fi
           gh release create "$GITHUB_REF_NAME" \
-            release-assets/* \
+            release-assets/slideit-linux-x86_64.tar.gz \
             --verify-tag \
             --generate-notes \
             --title "Slideit $GITHUB_REF_NAME" \

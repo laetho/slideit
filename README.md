@@ -71,10 +71,9 @@ AVIF  BMP  GIF  HEIC  HEIF  JPEG  JPG  PNG  TIFF  TIF  WebP
 Actual decoding support depends on the Qt image plugins installed on the
 system.
 
-Creation-time ordering uses the filesystem creation or birth timestamp exposed
-by Linux, macOS, or Windows. If it is unavailable, Slideit falls back to the
-modification time. Filesystem creation time is not the camera's EXIF capture
-date.
+Creation-time ordering uses the filesystem birth timestamp exposed by Linux.
+If it is unavailable, Slideit falls back to the modification time. Filesystem
+creation time is not the camera's EXIF capture date.
 
 ## Controls
 
@@ -136,14 +135,8 @@ Default values:
 | Frame | White, medium |
 | Transition | Fade |
 
-Slideit stores settings under the platform's standard user configuration
-directory:
-
-```text
-<user-config-directory>/slideit/settings.json
-```
-
-On Linux this normally resolves to:
+Slideit stores settings under the standard Linux user configuration directory,
+which normally resolves to:
 
 ```text
 $XDG_CONFIG_HOME/slideit/settings.json
@@ -163,8 +156,7 @@ On Omarchy, Slideit reads the active palette from:
 
 Theme changes are detected while the application is running. Slideit uses a
 built-in palette when these files are unavailable, allowing it to run on other
-Linux desktops, macOS, and Windows. The generic `monospace` family is resolved
-by the host platform.
+Linux desktops. The generic `monospace` family is resolved by the desktop.
 
 ## Development
 
@@ -222,50 +214,25 @@ Slideit is licensed under the [MIT License](LICENSE).
 
 ## Continuous integration
 
-GitHub Actions builds a native matrix for:
-
-- Linux x86-64
-- Windows x86-64 with MSYS2 UCRT64/MinGW
-- macOS Apple Silicon
-- macOS Intel
+GitHub Actions builds and tests Slideit on Linux x86-64.
 
 CI runs on pushes to `main`, pull requests, version tags, and manual dispatch.
 Build artifacts are retained for 14 days.
 
-Release packaging differs by platform:
-
-- Linux remains a binary-only tarball and requires compatible Qt libraries and
-  QML modules on the target system.
-- Windows is a self-contained portable directory ZIP produced by `windeployqt`,
-  including the MinGW-w64 runtime DLLs (`libgcc_s_seh-1.dll`, `libstdc++-6.dll`,
-  `libwinpthread-1.dll`) that the cgo-linked executable and the Qt DLLs require.
-  It targets Windows 10 or newer, which provides the Universal C Runtime. The
-  bundled GCC runtime DLLs are redistributable under the GCC Runtime Library
-  Exception; `libwinpthread-1.dll` is MIT/BSD licensed.
-- macOS is a self-contained, ad-hoc-signed `Slideit.app` ZIP produced by
-  `macdeployqt`. It is not notarized, so Gatekeeper may require users to confirm
-  that they want to open it.
+The release is a binary-only Linux tarball and requires compatible Qt libraries
+and QML modules on the target system.
 
 ### Platform notes
 
 - Linux uses the complete Qt 6.8.3 desktop package so Qt's matching ICU runtime
   is available. GCC's repetitive Qt `QChar` SFINAE diagnostic is suppressed;
   other C++ warnings remain enabled.
-- macOS uses Homebrew Qt and `pkg-config`. MIQT-generated C++ is compiled in
-  C++17 mode. The macOS CI jobs pin Xcode 16.1 (Apple clang 16.0.0) because the
-  runner's default Xcode 16.4 (clang 17.0.0) crashes the compiler frontend while
-  building MIQT's generated `gen_qiconengine.cpp`; do not remove that pin without
-  confirming the newer toolchain no longer crashes. `macdeployqt` deploys without
-  signing; CI then ad-hoc signs nested Mach-O files and bundles inside-out before
-  signing and verifying the outer application.
-- Windows builds inside MSYS2 UCRT64 and runs Go commands directly in that
-  environment.
-- Go module and cgo build caches are isolated by platform and toolchain. Increase
-  `CGO_CACHE_EPOCH` in the workflow after changing the Qt ABI or compiler family.
+- Increase `CGO_CACHE_EPOCH` in the workflow after changing the Qt ABI or
+  compiler family.
 
 ## Releases
 
-Push a version tag to run the complete matrix and publish a GitHub release:
+Push a version tag to run CI and publish a GitHub release:
 
 ```bash
 git tag v0.1.0
@@ -283,7 +250,4 @@ Expected release assets:
 
 ```text
 slideit-linux-x86_64.tar.gz
-slideit-windows-x86_64.zip
-slideit-macos-arm64.zip
-slideit-macos-x86_64.zip
 ```
