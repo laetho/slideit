@@ -30,6 +30,12 @@ found=0
 while IFS= read -r -d '' f; do
   while IFS= read -r dll; do
     found=$((found + 1))
+    # API-set contract names are resolved by the Windows loader and do not
+    # necessarily exist as physical files in System32 or the application
+    # directory. They must not be treated as redistributable runtime DLLs.
+    case "${dll,,}" in
+      api-ms-win-*.dll|ext-ms-win-*.dll) continue ;;
+    esac
     if [[ -f "$stage/$dll" || -f "$system32/$dll" ]]; then
       continue
     fi

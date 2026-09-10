@@ -55,7 +55,14 @@ MOCK_DLLS="KERNEL32.dll ADVAPI32.dll Qt6Core.dll libstdc++-6.dll" \
   check "all-resolvable passes" 0 \
   bash "$audit" "$tmp/stage_ok" "$tmp/stage_ok/slideit.exe"
 
-# Case 2: a runtime DLL missing from both the staging directory and System32
+# Case 2: Windows API-set contracts are resolved by the loader and need not
+# exist as physical files in either the staging directory or System32.
+MOCK_DLLS="KERNEL32.dll api-ms-win-crt-environment-l1-1-0.dll EXT-MS-WIN-NTUSER-WINDOW-L1-1-0.DLL" \
+  SYSTEM32_DIR="$tmp/system32" \
+  check "API-set contracts pass" 0 \
+  bash "$audit" "$tmp/stage_ok" "$tmp/stage_ok/slideit.exe"
+
+# Case 3: a runtime DLL missing from both the staging directory and System32
 # -> fail with a missing-DLL error.
 mkdir -p "$tmp/stage_missing"
 for d in Qt6Core.dll; do : > "$tmp/stage_missing/$d"; done
@@ -65,7 +72,7 @@ MOCK_DLLS="KERNEL32.dll Qt6Core.dll libstdc++-6.dll" \
   check "missing-DLL fails" 1 \
   bash "$audit" "$tmp/stage_missing" "$tmp/stage_missing/slideit.exe"
 
-# Case 3: objdump yields no DLL names (e.g. output format changed) -> the
+# Case 4: objdump yields no DLL names (e.g. output format changed) -> the
 # zero-imports guard fails instead of silently passing.
 mkdir -p "$tmp/stage_empty"
 : > "$tmp/stage_empty/slideit.exe"
@@ -74,7 +81,7 @@ MOCK_DLLS="" \
   check "zero-DLLs guard fails" 1 \
   bash "$audit" "$tmp/stage_empty" "$tmp/stage_empty/slideit.exe"
 
-# Case 4: transitive dependency — a DLL bundled in the staging directory
+# Case 5: transitive dependency — a DLL bundled in the staging directory
 # imports a DLL that is missing -> fail. This is the ICU/zlib scenario that
 # auditing only the executable would miss.
 mkdir -p "$tmp/stage_transitive"
@@ -86,7 +93,7 @@ MOCK_DLLS="KERNEL32.dll Qt6Core.dll icuuc.dll" \
   check "transitive-missing-DLL fails" 1 \
   bash "$audit" "$tmp/stage_transitive" "$tmp/stage_transitive/slideit.exe"
 
-# Case 5: missing staging directory or binary -> fail with a clear error.
+# Case 6: missing staging directory or binary -> fail with a clear error.
 check "missing-staging-dir fails" 1 \
   bash "$audit" "$tmp/does-not-exist" "$tmp/stage_ok/slideit.exe"
 check "missing-binary fails" 1 \
