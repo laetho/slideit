@@ -236,7 +236,12 @@ Release packaging differs by platform:
 
 - Linux remains a binary-only tarball and requires compatible Qt libraries and
   QML modules on the target system.
-- Windows is a self-contained portable directory ZIP produced by `windeployqt`.
+- Windows is a self-contained portable directory ZIP produced by `windeployqt`,
+  including the MinGW-w64 runtime DLLs (`libgcc_s_seh-1.dll`, `libstdc++-6.dll`,
+  `libwinpthread-1.dll`) that the cgo-linked executable and the Qt DLLs require.
+  It targets Windows 10 or newer, which provides the Universal C Runtime. The
+  bundled GCC runtime DLLs are redistributable under the GCC Runtime Library
+  Exception; `libwinpthread-1.dll` is MIT/BSD licensed.
 - macOS is a self-contained, ad-hoc-signed `Slideit.app` ZIP produced by
   `macdeployqt`. It is not notarized, so Gatekeeper may require users to confirm
   that they want to open it.

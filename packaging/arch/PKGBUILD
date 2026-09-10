@@ -1,7 +1,7 @@
 # Maintainer: Laetho <https://github.com/laetho>
 
 pkgname=slideit
-pkgver=0.1.2
+pkgver=0.1.5
 pkgrel=1
 pkgdesc='Keyboard-first local photo slideshow for Omarchy and Arch Linux'
 arch=('x86_64')
@@ -27,7 +27,7 @@ source=(
   'LICENSE'
 )
 sha256sums=(
-  '65b0f50a2e10fe5cee2359ccd084763d0f64f142dc366132d37946805e7c6e96'
+  '0ae44645f9227a8de2dcf31cf11c03f378e66cc2104f48280a78f5bca3681d8a'
   '42a5723455ef5ebe47f6ef913fb98faa7d8f6af68aff7d6000779a80178ad956'
   'f1631fc601b5718f101bd226fa09398d0ce48e1e90b1e1d1a3168bbf6cabbbc5'
 )

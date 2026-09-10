@@ -233,6 +233,24 @@ jobs:
             --qmldir "$PWD/qml" \
             --dir "$stage" \
             "$stage/${{ matrix.binary }}"
+
+          # windeployqt does not reliably bundle the MinGW-w64 runtime DLLs that
+          # the cgo-linked executable and the Qt DLLs depend on. Copy them
+          # explicitly so the portable directory runs on machines without MSYS2.
+          cp /ucrt64/bin/libgcc_s_seh-1.dll \
+             /ucrt64/bin/libstdc++-6.dll \
+             /ucrt64/bin/libwinpthread-1.dll \
+             "$stage/"
+          test -f "$stage/libgcc_s_seh-1.dll"
+          test -f "$stage/libstdc++-6.dll"
+          test -f "$stage/libwinpthread-1.dll"
+
+          # Audit: every DLL imported by the executable or any bundled DLL must
+          # be either bundled in the staging directory or provided by Windows
+          # itself. Catches future missing-DLL regressions, including transitive
+          # Qt dependencies (e.g. ICU, zlib).
+          bash scripts/audit-windows-deps.sh "$stage" "build/${{ matrix.binary }}"
+
           test -f "$stage/platforms/qwindows.dll"
           test -d "$stage/qml/QtQuick"
 
